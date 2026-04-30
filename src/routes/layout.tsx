@@ -12,6 +12,7 @@ export function RootLayout() {
           <div className="nav-links">
             <Link to="/">Home</Link>
             <Link to="/about">About</Link>
+            <Link to="/doc">Doc</Link>
           </div>
         </div>
       </nav>

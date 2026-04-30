@@ -19,6 +19,10 @@ export function HomePage() {
           <h3>Fast Dev Server</h3>
           <p>Powered by Vite for instant HMR and optimized builds.</p>
         </div>
+        <Link to="/doc" className="feature-card feature-link">
+          <h3>Document</h3>
+          <p>View the embedded document.</p>
+        </Link>
       </div>
 
       <div className="actions">
