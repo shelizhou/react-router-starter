@@ -9,16 +9,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+async function serveAsset(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+
+  // Try to serve the requested asset
+  try {
+    const asset = await env.ASSETS.fetch(request);
+    if (asset.ok) return asset;
+  } catch {
+    // Asset fetch failed, fall through to SPA fallback
+  }
+
+  // SPA fallback: return index.html for client-side routes
+  try {
+    const indexReq = new Request(new URL("/index.html", url.origin));
+    const index = await env.ASSETS.fetch(indexReq);
+    return new Response(index.body, {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  } catch (e: any) {
+    return new Response(
+      `<!DOCTYPE html><html><body><h1>Asset Error</h1><pre>${e?.message || "unknown"}</pre></body></html>`,
+      { status: 500, headers: { "Content-Type": "text/html" } }
+    );
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    // API routes
     if (path.startsWith("/api/items")) {
       try {
         const response = await handleApi(request, env);
@@ -32,16 +58,7 @@ export default {
       }
     }
 
-    // Static assets (CSS, JS, images, etc.)
-    const asset = await env.ASSETS.fetch(request);
-    if (asset.ok) return asset;
-
-    // SPA fallback: serve index.html for client-side routes
-    const indexHtml = await env.ASSETS.fetch(new URL("/index.html", request.url));
-    return new Response(indexHtml.body, {
-      status: 200,
-      headers: { "Content-Type": "text/html" },
-    });
+    return serveAsset(request, env);
   },
 };
 
@@ -54,7 +71,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   }
 
   if (request.method === "POST") {
-    const { key, value } = await request.json();
+    const body = await request.json();
+    const { key, value } = body;
     if (!key) return Response.json({ error: "key is required" }, { status: 400 });
     const id = crypto.randomUUID();
     await env.DB
