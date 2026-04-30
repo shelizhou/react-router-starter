@@ -18,13 +18,31 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // API routes
     if (path.startsWith("/api/items")) {
       const response = await handleApi(request, env);
       Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
       return response;
     }
 
-    return env.ASSETS.fetch(request);
+    // Try static assets first (CSS, JS, images, etc.)
+    try {
+      const asset = await env.ASSETS.fetch(request);
+      if (asset.status !== 404) return asset;
+    } catch {
+      // Asset not found, fall through to SPA fallback
+    }
+
+    // SPA fallback: serve index.html for client-side routes
+    try {
+      const indexHtml = await env.ASSETS.fetch(new URL("/index.html", request.url));
+      return new Response(indexHtml.body, {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+    } catch (e) {
+      return new Response("Internal Server Error", { status: 500 });
+    }
   },
 };
 
