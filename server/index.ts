@@ -3,91 +3,81 @@ export interface Env {
   ASSETS: Fetcher;
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-async function serveAsset(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-
-  // Try to serve the requested asset
-  try {
-    const asset = await env.ASSETS.fetch(request);
-    if (asset.ok) return asset;
-  } catch {
-    // Asset fetch failed, fall through to SPA fallback
-  }
-
-  // SPA fallback: return index.html for client-side routes
-  try {
-    const indexReq = new Request(new URL("/index.html", url.origin));
-    const index = await env.ASSETS.fetch(indexReq);
-    return new Response(index.body, {
-      status: 200,
-      headers: { "Content-Type": "text/html" },
-    });
-  } catch (e: any) {
-    return new Response(
-      `<!DOCTYPE html><html><body><h1>Asset Error</h1><pre>${e?.message || "unknown"}</pre></body></html>`,
-      { status: 500, headers: { "Content-Type": "text/html" } }
-    );
-  }
-}
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-
+    // API routes
     if (path.startsWith("/api/items")) {
-      try {
-        const response = await handleApi(request, env);
-        Object.entries(corsHeaders).forEach(([k, v]) => response.headers.set(k, v));
-        return response;
-      } catch (e: any) {
-        return new Response(JSON.stringify({ error: e.message || "Internal error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      return handleApi(request, env, url);
     }
 
-    return serveAsset(request, env);
+    // Try to serve the static asset
+    const assetUrl = new URL(path, url.origin);
+    const asset = await env.ASSETS.fetch(new Request(assetUrl.toString()));
+
+    if (asset.ok) {
+      return asset;
+    }
+
+    // SPA fallback: serve index.html for client-side routes
+    return env.ASSETS.fetch(new Request(new URL("/index.html", url.origin).toString()));
   },
 };
 
-async function handleApi(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-
-  if (request.method === "GET") {
-    const { results } = await env.DB.prepare("SELECT * FROM items ORDER BY updated_at DESC").all();
-    return Response.json(results);
+async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
   }
 
-  if (request.method === "POST") {
-    const body = await request.json();
-    const { key, value } = body;
-    if (!key) return Response.json({ error: "key is required" }, { status: 400 });
-    const id = crypto.randomUUID();
-    await env.DB
-      .prepare("INSERT INTO items (id, key, value) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')")
-      .bind(id, key, value, value)
-      .run();
-    return Response.json({ id, key, value }, { status: 201 });
-  }
+  try {
+    if (request.method === "GET") {
+      const { results } = await env.DB.prepare("SELECT * FROM items ORDER BY updated_at DESC").all();
+      return Response.json(results, {
+        headers: { "Access-Control-Allow-Origin": "*" },
+      });
+    }
 
-  if (request.method === "DELETE") {
-    const id = url.searchParams.get("id");
-    if (!id) return Response.json({ error: "id is required" }, { status: 400 });
-    await env.DB.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
-    return new Response(null, { status: 204 });
-  }
+    if (request.method === "POST") {
+      const body = await request.json();
+      const { key, value } = body;
+      if (!key) {
+        return Response.json({ error: "key is required" }, { status: 400 });
+      }
+      const id = crypto.randomUUID();
+      await env.DB
+        .prepare(
+          "INSERT INTO items (id, key, value) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime('now')"
+        )
+        .bind(id, key, value, value)
+        .run();
+      return Response.json({ id, key, value }, {
+        status: 201,
+        headers: { "Access-Control-Allow-Origin": "*" },
+      });
+    }
 
-  return new Response("Not Found", { status: 404 });
+    if (request.method === "DELETE") {
+      const id = url.searchParams.get("id");
+      if (!id) {
+        return Response.json({ error: "id is required" }, { status: 400 });
+      }
+      await env.DB.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
+      return new Response(null, { status: 204 });
+    }
+
+    return new Response("Method not allowed", { status: 405 });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message || "Internal error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 }

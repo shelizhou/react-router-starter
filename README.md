@@ -2,22 +2,23 @@
 
 A modern starter template built with React Router v7, Vite, TypeScript, and Cloudflare D1 database.
 
-## Getting Started
+## Quick Start
 
 ```bash
 npm install
-npm run dev
+npm run dev          # Vite dev server
+npx wrangler dev     # Worker API (另开终端)
 ```
 
-## Cloudflare Setup
+## D1 Database Setup
 
-### 1. Create D1 Database
+### 1. Create Database
 
 ```bash
 npx wrangler d1 create app-db
 ```
 
-Copy the database ID from the output and paste it into `wrangler.toml`:
+把输出的 `database_id` 填入 `wrangler.toml`：
 
 ```toml
 [[d1_databases]]
@@ -26,39 +27,52 @@ database_name = "app-db"
 database_id = "YOUR_DATABASE_ID_HERE"
 ```
 
-### 2. Run Database Migration
-
-Local:
-```bash
-wrangler d1 execute app-db --local --file migrations/001_create_items.sql
-```
-
-Production:
-```bash
-wrangler d1 execute app-db --remote --file migrations/001_create_items.sql
-```
-
-### 3. Local Development (with API)
-
-To test Pages Functions locally with D1:
+### 2. Initialize Local Database（本地开发）
 
 ```bash
-npx wrangler pages dev dist --local
+npx wrangler d1 execute app-db --local --file migrations/001_create_items.sql
 ```
 
-### 4. Deploy
+这会创建 `items` 表，用于 key-value 存储。
+
+### 3. Initialize Remote Database（生产环境）
+
+```bash
+npx wrangler d1 execute app-db --remote --file migrations/001_create_items.sql
+```
+
+### 4. View Database
+
+```bash
+# 本地
+npx wrangler d1 execute app-db --local --command "SELECT * FROM items;"
+
+# 远程
+npx wrangler d1 execute app-db --remote --command "SELECT * FROM items;"
+```
+
+### 5. Add New Migrations
+
+在 `migrations/` 目录下新建 SQL 文件，例如 `002_add_users.sql`，然后执行：
+
+```bash
+npx wrangler d1 execute app-db --remote --file migrations/002_add_users.sql
+```
+
+## Deploy
 
 ```bash
 npm run deploy
 ```
 
+会自动执行 `npm run build` 然后通过 `wrangler deploy` 部署到 Cloudflare Workers。
+
 ## Project Structure
 
 ```
 react-router-starter/
-├── functions/              # Cloudflare Pages Functions (server API)
-│   └── api/
-│       └── items.ts        # Key-value CRUD API
+├── server/                 # Worker entry point
+│   └── index.ts            # API routes + SPA fallback
 ├── migrations/             # D1 database migrations
 │   └── 001_create_items.sql
 ├── public/                 # Static assets
@@ -90,13 +104,13 @@ react-router-starter/
 - **React Router v7** - Client-side routing with `createBrowserRouter`
 - **Vite** - Fast dev server and optimized builds
 - **TypeScript** - Full type safety
-- **Cloudflare Pages** - Hosting and serverless functions
+- **Cloudflare Workers** - Serverless hosting with D1 database
 - **Cloudflare D1** - SQLite database at the edge
 
 ## Available Scripts
 
 | Command        | Description                 |
 |----------------|-----------------------------|
-| `npm run dev`  | Start development server    |
+| `npm run dev`  | Start Vite development server |
 | `npm run build`| Build for production        |
 | `npm run deploy` | Build and deploy to Cloudflare |
