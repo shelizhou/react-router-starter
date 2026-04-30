@@ -1,0 +1,8 @@
+name = "react-router-starter"
+compatibility_date = "2025-04-01"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "app-db"
+database_id = "9495f805-54ae-4f4f-b20b-5c2072450e3d"  # Run `npm run db:create` to get this

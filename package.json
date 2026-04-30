@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler pages deploy dist --branch main",
+    "db:create": "wrangler d1 create app-db",
+    "db:migrate": "wrangler d1 execute app-db --local",
+    "db:migrate:prod": "wrangler d1 execute app-db --remote"
   },
   "dependencies": {
     "react": "^19.0.0",
@@ -13,10 +17,12 @@
     "react-router": "^7.5.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241230.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.7.0",
+    "wrangler": "^4.0.0",
     "vite": "^6.1.0"
   }
 }

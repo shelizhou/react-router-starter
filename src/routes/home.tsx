@@ -23,6 +23,10 @@ export function HomePage() {
           <h3>Document</h3>
           <p>View the embedded document.</p>
         </Link>
+        <Link to="/store" className="feature-card feature-link">
+          <h3>Data Store</h3>
+          <p>Key-value storage with Cloudflare D1.</p>
+        </Link>
       </div>
 
       <div className="actions">
